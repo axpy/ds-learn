@@ -3,8 +3,7 @@
 # **********************************
 
 # Many libraries will throw errors in case of missing values, so data should be prepared.
-# Drop columns (simply remove column)
-# Imputation (replacing missing values with predicted similar ones)
+# Drop columns (simply remove column) # Imputation (replacing missing values with predicted similar ones)
 # Extension to imputation (imputation + creating new boolean column, noting is value from that column was synthetically imputed)
 
 cols_with_missing = [col for col in X_train.columns if X_train[col].isnull().any()] # List of columns with missing data
@@ -46,8 +45,7 @@ imputed_X_valid_copy.columns = X_valid_copy.columns
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-X_full = pd.read_csv('../input/train.csv', index_col='Id')
-X_test_full = pd.read_csv('../input/test.csv', index_col='Id')
+X_full = pd.read_csv('../input/train.csv', index_col='Id') X_test_full = pd.read_csv('../input/test.csv', index_col='Id')
 
 # Remove rows with missing target, separate target from predictors
 X_full.dropna(axis=0, subset=['SalePrice'], inplace=True) # Remove rows with NaN SalesPrices values
@@ -191,8 +189,11 @@ num_X_valid = X_valid.drop(object_cols, axis=1)
 OH_X_train = pd.concat([num_X_train, OH_cols_train], axis=1)
 OH_X_valid = pd.concat([num_X_valid, OH_cols_valid], axis=1)
 
+# *************EXAMPLE***************
+# *************EXAMPLE***************
+# *************EXAMPLE***************
 
-# Label encoding examlpe
+# Data preparation
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -208,6 +209,8 @@ X.drop(['SalePrice'], axis=1, inplace=True)
 X_train, X_valid, y_train, y_valid = train_test_split(X, y,
                                                       train_size=0.8, test_size=0.2,
                                                       random_state=0)
+
+# Label encoding example
 
 X_train['Condition2'].unique() !== X_valid['Condition2'].unique()
 # There's a problem. Train and valid data frames may have different labels.
@@ -234,14 +237,117 @@ for col in good_label_cols:
     label_X_valid[col] = label_encoder.transform(X_valid[col])
 
 
+# Cardinality
+object_nunique = list(map(lambda col: X_train[col].nunique(), object_cols)) # Number of unique entries in each column
+d = dict(zip(object_cols, object_nunique)) # Mapped to column name
+
+# The more unique entries column has, the more columns for each entry added. This property called cardinality. 
+# Low unique values = low cardinality, and vice versa
+# E.g If dataset contains 10000 entries, and one column has 100 unique entries, we need to add 100 columns to each entry, with total of 990000 new entries (and dropping old column)
+
+low_cardinality_cols = [col for col in object_cols if X_train[col].nunique() < 10] # list of cols with low cardinality
+high_cardinality_cols = list(set(object_cols) - set(low_cardinality_cols))
+
+OH_encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+OH_cols_train = pd.DataFrame(OH_encoder.fit_transform(X_train[low_cardinality_cols]))
+OH_cols_valid = pd.DataFrame(OH_encoder.transform(X_valid[low_cardinality_cols]))
+OH_cols_train.index = X_train.index
+OH_cols_valid.index = X_valid.index
+
+reduced_X_train = X_train.drop(object_cols, axis=1);
+reduced_X_valid = X_valid.drop(object_cols, axis=1);
+
+OH_X_train = pd.concat([reduced_X_train, OH_cols_train], axis=1)
+OH_X_valid = pd.concat([reduced_X_valid, OH_cols_valid], axis=1)
 
 
+# Label Encoding + One-Hot Encoding
+
+# Instead of dropping columns with high cardinality
+# Apply label encoding on them
+
+# 1. Separate cols by low & high cardinality
+object_cols = [col for col in X_train.columns if X_train[col].dtype == "object"]
+low_cardinality_cols = [col for col in object_cols if X_train[col].nunique() < 10]
+high_cardinality_cols = list(set(object_cols) - set(low_cardinality_cols))
+
+# 2. Check cols aren't dirty (have same sets of unique values in columns). Drop'em if they're.
+good_label_cols = [col for col in high_cardinality_cols if set(X_train[col]) == set(X_valid[col]) == set(X_test[col])]
+bad_label_cols = list(set(high_cardinality_cols)-set(good_label_cols))
+
+label_X_train = X_train.drop(bad_label_cols, axis=1)
+label_X_valid = X_valid.drop(bad_label_cols, axis=1)
+label_X_test = X_test.drop(bad_label_cols, axis=1)
+
+# 3. Create label encoder and fit it.
+label_encoder = LabelEncoder()
+for col in good_label_cols:
+    label_X_train[col] = label_encoder.fit_transform(X_train[col])
+    label_X_valid[col] = label_encoder.transform(X_valid[col])
+    label_X_test[col] = label_encoder.transform(X_test[col])
+
+# 4. Create OneHot Encoder and fit and transform all other low cardinality columns.
+OH_encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+OH_cols_train = pd.DataFrame(OH_encoder.fit_transform(label_X_train[low_cardinality_cols]))
+OH_cols_valid = pd.DataFrame(OH_encoder.transform(label_X_valid[low_cardinality_cols]))
+OH_cols_test = pd.DataFrame(OH_encoder.transform(label_X_test[low_cardinality_cols]))
+
+OH_cols_train.index = label_X_train.index
+OH_cols_valid.index = label_X_valid.index
+OH_cols_test.index = label_X_test.index
+
+reduced_X_train = label_X_train.drop(low_cardinality_cols, axis=1)
+reduced_X_valid = label_X_valid.drop(low_cardinality_cols, axis=1)
+reduced_X_test = label_X_test.drop(low_cardinality_cols, axis=1)
+
+final_X_train = pd.concat([reduced_X_train, OH_cols_train], axis=1)
+final_X_valid = pd.concat([reduced_X_valid, OH_cols_valid], axis=1)
+final_X_test = pd.concat([reduced_X_test, OH_cols_test], axis=1)
 
 
+# *****************************
+# **********PIPELINES**********
+# *****************************
 
+# Pipelines are made for preprocessing data automation. It's less error prone, and easier to reuse.
 
+# 1. Define steps
+# a) Impute missing values in numerical data
+# b) Impute values and apply a one-hot encoding to categorical data
 
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
 
+# Preprocessing for numerical data
+numerical_transformer = SimpleImputer(strategy='constant')
 
+# Preprocessing for categorical data
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
 
+# Bundle preprocessing for numerical and categorical data
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numerical_transformer, numerical_cols),
+        ('cat', categorical_transformer, categorical_cols)
+    ])
+
+# 2. Define the model
+
+from sklearn.ensemble import RandomForestRegressor
+
+model = RandomForestRegressor(n_estimators=100, random_state=0)
+
+# 3. Use. Define pipeline and use it just as a regular model
+
+my_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                              ('model', model)
+                             ])
+
+my_pipeline.fit(X_train, y_train)
+preds = my_pipeline.predict(X_valid)
 
