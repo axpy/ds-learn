@@ -127,6 +127,13 @@ final_X_valid.columns = reduced_X_train.columns
 
 
 
+
+
+
+
+
+
+
 # *****************************************
 # **********CATEGORICAL VARIABLES**********
 # *****************************************
@@ -305,6 +312,14 @@ final_X_valid = pd.concat([reduced_X_valid, OH_cols_valid], axis=1)
 final_X_test = pd.concat([reduced_X_test, OH_cols_test], axis=1)
 
 
+
+
+
+
+
+
+
+
 # *****************************
 # **********PIPELINES**********
 # *****************************
@@ -350,4 +365,112 @@ my_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
 
 my_pipeline.fit(X_train, y_train)
 preds = my_pipeline.predict(X_valid)
+
+
+
+
+
+
+
+
+
+# ********************************************
+# *************CROSS VALIDATION***************
+# ********************************************
+
+# Given limited data set. Taking first 20% for data validation may differ from another 20% and so on.
+# Cross validation is the modeling process on different subsets to get multiple measure quality. Perfect for small datasets. As big datasets may have enough data for 20% data and it may process too slow.
+# For example: dividing data into 5 pieces, each 20% of the full dataset - data is broken into 5 "folds"
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+
+my_pipeline = Pipeline(steps=[('preprocessor', SimpleImputer()),
+                              ('model', RandomForestRegressor(n_estimators=50,
+                                                              random_state=0))
+                             ])
+
+from sklearn.model_selection import cross_val_score
+
+# Multiply by -1 since sklearn calculates *negative* MAE
+scores = -1 * cross_val_score(my_pipeline, X, y,
+                              cv=5,
+                              scoring='neg_mean_absolute_error')
+
+
+
+
+
+
+
+
+
+
+
+# ***********************************
+# *************XGBoost***************
+# ***********************************
+
+# Random Forest Regressor is 'ensemble method'. Ensemble method combines predictions of several models (in case of RF - several trees).
+
+# XGBoost is another ensemble method. XGBoost build decision tree one each time. Each new tree corrects errors which were made by previously trained decision tree.
+# How it works?
+# 1. Create first naive model
+# 2. Make predictions
+# 3. Calculate error
+# 4. Use error to fit new model that will be added to ensemble
+# 5. Repeat from #2
+
+# RF takes only 2 params: n_estimators - amount of trees, and number of features to be seleceted.
+# XGBoost takes lots more.
+
+# 1. n_estimators - how many times cycle will be ran
+my_model = XGBRegressor(n_estimators=500)
+my_model.fit(X_train, y_train)
+
+# 2. early_stopping_rounds - says the model when to stop iterating, when validation score stops improving. Also by specifying early_stopping_rounds we need to include vaildation data - as model should compare predictions with real y.
+my_model = XGBRegressor(n_estimators=500)
+my_model.fit(X_train, y_train,
+             early_stopping_rounds=5,
+             eval_set=[(X_valid, y_valid)],
+             verbose=False)
+
+# 3. learning_rate - specifing small number will make each run help us less - but with that we can use larger n_estimators and avoid overfitting by that
+my_model = XGBRegressor(n_estimators=1000, learning_rate=0.05)
+my_model.fit(X_train, y_train, 
+             early_stopping_rounds=5, 
+             eval_set=[(X_valid, y_valid)], 
+             verbose=False)
+
+# 4. n_jobs - multithreading, best to set to amount of cores of processor
+my_model = XGBRegressor(n_estimators=1000, learning_rate=0.05, n_jobs=4)
+my_model.fit(X_train, y_train,
+             early_stopping_rounds=5,
+             eval_set=[(X_valid, y_valid)],
+             verbose=False)
+
+
+
+
+
+
+
+
+
+# ****************************************
+# *************DATA LEAKAGE***************
+# ****************************************
+
+# Data leakage is when you have strong predictions on train data, with very poor predictions on the prod data.
+
+# Target leakage
+# For example having strong connections between some columns 
+# And in prod "real-time" data may occur "lag", when first dependent column is changed, but another is not. Such dependencies should be removed
+
+# Train-test contamination
+# Using test data in train data, for example impute values from fitted by valid data, not train.
+
+
+
 
