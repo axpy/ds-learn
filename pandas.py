@@ -98,6 +98,9 @@ reviews.point/reviews.price # Create new column with point/price ratio
 # Idxmax/Idxmin
 df.column.idxmax() # Get max value row index for that column
 df.column.idxmin() # Get min value row index for that column
+df.column.max() # Get max value of that column
+df.column.min() # Get min value of that column
+
 
 # Get title of best points/price ratio wine
 wine_index = (reviews.points/reviews.price).idxmax()
@@ -118,7 +121,62 @@ descriptor_counts = pd.Series([n_trop, n_fruit], index=['tropical', 'fruity'])
 
 
 
+# Grouping 
+# groupby - create groups (smaller DataFrames) where key is specified column name
+# df.groupby() returns DataFrame-like object, from which we can take column, apply stuff
+
+df.groupby('column').column.count() # How often each value occurs  
+# same as df['columnnmae'].value_counts() 
+# same as df.groupby('column').size()
+
+df.groupby('points').price.min() # Get min price of each group, grouped by points
+df.groupby('winery').apply(lambda df: df.title.iloc[-1]) # Get title of last item of each winery
+
+df.groupby(['country', 'province']).apply(lambda df: df.loc[df.points.idxmax()]) # Get Best pointed wines from each country-province
+# Returns DataFrame with multiinedx, to bring back - use reset_index()
+
+df.groupby('country').price.agg([len, min, max]) # agg - return list of Series with specified props
+
+# Sorting
+
+df.sort_values(by='column', acending=False)
+df.sort_values(by=['or', 'multiple'])
+df.sort_index()
 
 
 
+# Data types
+
+df.column.dtype # Return type of column
+df.dtype # Return Series with col-type values
+df.column.astype('some new type') # Return series as some other type
+
+pd.isnull(df.column) # Return list of indexes of entries with null value in column
+df[pd.notnull(df.column)] # Return new dataframe, filtered by columns with all not null values
+
+df.column.fillna("Unknown") # Replace by word
+df.column.replace('any value', 'by another any values')
+
+reviews_per_region = reviews.region_1.fillna("Unknown").value_counts().sort_values(ascending=False)
+# Replace all NaN values for region_1, count each, sort
+
+
+# Rename
+
+df.rename(columns={'a': 'A'})
+df.rename(index={0: 'firstEntry', 1: 'secondEntry'})
+
+df.rename_axis("name for row/entry", axis='rows').rename_axis("name for column, e.g - property", axis='columns')
+
+# Combining
+
+pd.concat([df_1, df_2]) # Combine two  data frames with same columns
+
+# Joining
+# Given 2 data frames. Find same events occured on the same day:
+
+left = df_1.set_index(['title', 'date']) # As title is unique, date may have multiple events
+right = df_2.set_index(['title', 'date']) # Same for second DF
+
+left.join(right, lsuffix='_CAN', rsuffix='_UK') # Join two DFs, with suffixed columns (as they have same names)
 
