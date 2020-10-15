@@ -166,6 +166,9 @@ for col in object_cols:
     label_X_valid[col] = label_encoder.transform(X_valid[col])
 # Example of generating random values. Ideally it should be done manually, as numbers' values matter
 
+x_train[object_cols].apply(label_encoder.fit_transform)
+# If only one DF transform is needed
+
 # --------------------One-Hot Encoding--------------------
 # Create new column for each possible categorical variable, and then insert appropriate number
 # Color    Red  Yellow  Green
